@@ -2,11 +2,29 @@
 
 const express = require("express");
 const bodyParser = require("body-parser");
+const mongoose = require("mongoose");
 const ejs = require("ejs");
 const _ = require("lodash");
+require("dotenv").config();
 const port = 3000;
-const posts = [];
+// const posts = [];
 
+const mongoDB = process.env.MONGO_URI;
+mongoose.set("strictQuery", false);
+// console.log(process.env);
+
+// Setup MongoDB driver
+const connectDB = async () => {
+  try {
+    const conn = await mongoose.connect(mongoDB);
+    console.log(`MongoDB Connected: ${conn.connection.host}`);
+  } catch (error) {
+    console.log(error);
+    process.exit(1);
+  }
+};
+
+// Sample data for the pages
 const homeStartingContent =
   "Lacus vel facilisis volutpat est velit egestas dui id ornare. Semper auctor neque vitae tempus quam. Sit amet cursus sit amet dictum sit amet justo. Viverra tellus in hac habitasse. Imperdiet proin fermentum leo vel orci porta. Donec ultrices tincidunt arcu non sodales neque sodales ut. Mattis molestie a iaculis at erat pellentesque adipiscing. Magnis dis parturient montes nascetur ridiculus mus mauris vitae ultricies. Adipiscing elit ut aliquam purus sit amet luctus venenatis lectus. Ultrices vitae auctor eu augue ut lectus arcu bibendum at. Odio euismod lacinia at quis risus sed vulputate odio ut. Cursus mattis molestie a iaculis at erat pellentesque adipiscing.";
 const aboutContent =
@@ -21,10 +39,24 @@ app.set("view engine", "ejs");
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
+// Create database schema
+
+const postSchema = new mongoose.Schema({
+  title: String,
+  content: String,
+});
+
+const Post = mongoose.model("Post", postSchema);
+
 app.get("/", (req, res) => {
-  res.render("home", {
-    startingContent: homeStartingContent,
-    posts: posts,
+  Post.find({}, function (err, posts) {
+    if (!err) {
+      res.render("home", {
+        startingContent: homeStartingContent,
+
+        posts: posts,
+      });
+    }
   });
 });
 
@@ -45,38 +77,77 @@ app.get("/compose", (req, res) => {
 });
 
 app.post("/compose", (req, res) => {
-  const post = {
+  const post = new Post({
     title: req.body.postTitle,
     content: req.body.postBody,
-  };
+  });
 
-  posts.push(post);
-
-  res.redirect("/");
+post.save(function (err) {
+  if (!err) {
+    res.redirect("/");
+  } else {
+    console.log(err);
+  }
 });
 
-app.get("/posts/:postName", (req, res) => {
+  // post.save();
+
+  // posts.push(post);
+
+  // res.redirect("/");
+});
+
+app.get("/posts/:postID", (req, res) => {
   // console.log(req.params.postName);
-  const requestedPostName = req.params.postName;
+  const requestedPostName = req.params.postID;
 
-  const newPostName = _.lowerCase(requestedPostName);
+  const newPostName = requestedPostName;
 
-  posts.forEach((post) => {
-    const newPostTitle = _.lowerCase(post.title);
-    const newPostBody = post.content;
+ Post.findOne({_id: newPostName}, function(err,post){
+  if(err){
+    console.log("No Match found " + err);
+  } else {
+    res.render("post", {
+            newPostTitle: post.title,
+            newPostBody: post.content,
+    });
 
-    if (newPostTitle === newPostName) {
-      console.log("Match found!");
-      res.render("post", {
-        newPostTitle: post.title,
-        newPostBody: newPostBody,
-      });
-    } else {
-      console.log(newPostTitle + " != " + newPostName);
-    }
+
+  }
+ })
+
+
+//   Post.findOne({_id: newPostName}, function (err, posts){
+// posts.forEach((post) => {
+//   const postIDs = post._id;
+//   const newPostTitle = _.lowerCase(post.title);
+//   const newPostBody = post.content;
+
+//   console.log(requestedPostName);
+//   if (postIDs === newPostName) {
+//     console.log("Match found!");
+//     res.render("post", {
+//       newPostTitle: post.title,
+//       newPostBody: newPostBody,
+//     });
+//   } else {
+//     console.log(postIDs + " != " + newPostName);
+//   }
+// });
+
+//   })
+
+
+
+  
+});
+
+connectDB().then(() => {
+  app.listen(port, () => {
+    console.log("Server Started with database");
   });
 });
 
-app.listen(port, function () {
-  console.log("Server started on port 3000");
-});
+// app.listen(port, function () {
+//   console.log("Server started on port 3000");
+// });
